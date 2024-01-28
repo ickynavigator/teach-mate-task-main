@@ -32,12 +32,22 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useAppSelector } from '@/store/hooks';
-import { Task } from '@/types';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { Status, Task } from '@/types';
 
+import { taskActions } from '@/store/task/taskSlice';
+import { Select } from '@radix-ui/react-select';
+import { format } from 'date-fns';
 import DeleteTask from './DeleteTask';
 import EditTask from './EditTask';
 import ViewTask from './ViewTask';
+import {
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './ui/select';
 
 export const columns: ColumnDef<Task>[] = [
   {
@@ -85,12 +95,16 @@ export const columns: ColumnDef<Task>[] = [
     cell: ({ row }) => <div className="lowercase">{row.getValue('title')}</div>,
   },
   {
+    accessorKey: 'description',
+    cell: ({ row }) => (
+      <div className="lowercase">{row.getValue('description')}</div>
+    ),
+  },
+  {
     accessorKey: 'date',
     header: () => <div className="text-right">Due Date</div>,
     cell: ({ row }) => {
-      const formatted = new Intl.DateTimeFormat('en-US', {}).format(
-        new Date(row.getValue('date')),
-      );
+      const formatted = format(row.getValue('date'), 'PPP');
 
       return <div className="text-right font-medium">{formatted}</div>;
     },
@@ -109,36 +123,6 @@ export const columns: ColumnDef<Task>[] = [
           <DeleteTask taskId={task.id} />
         </div>
       );
-
-      // return (
-      //   <DropdownMenu>
-      //     <DropdownMenuTrigger asChild>
-      //       <Button variant="ghost" className="h-8 w-8 p-0">
-      //         <span className="sr-only">Open menu</span>
-      //         <MoreHorizontal className="h-4 w-4" />
-      //       </Button>
-      //     </DropdownMenuTrigger>
-
-      //     <DropdownMenuContent align="end">
-      //       <DropdownMenuLabel>Actions</DropdownMenuLabel>
-      //       <DropdownMenuItem
-      //         onClick={() => navigator.clipboard.writeText(task.title)}
-      //       >
-      //         Copy Task Title
-      //       </DropdownMenuItem>
-
-      //       <DropdownMenuSeparator />
-
-      //       <DropdownMenuItem>
-      //         <EditTask taskId={task.id} />
-      //       </DropdownMenuItem>
-
-      //       <DropdownMenuItem onClick={handleDeleteClick}>
-      //         Delete
-      //       </DropdownMenuItem>
-      //     </DropdownMenuContent>
-      //   </DropdownMenu>
-      // );
     },
   },
 ];
@@ -149,9 +133,21 @@ export function TodoTable() {
     [],
   );
   const [columnVisibility, setColumnVisibility] =
-    React.useState<VisibilityState>({});
+    React.useState<VisibilityState>({
+      description: false,
+    });
   const [rowSelection, setRowSelection] = React.useState({});
+
+  const dispatch = useAppDispatch();
   const data = useAppSelector(state => state.task.tasks);
+
+  const deleteSelected = () => {
+    const selected = table
+      .getFilteredSelectedRowModel()
+      .rows.map(row => row.original.id);
+    dispatch(taskActions.deleteMultipleTasks(selected));
+  };
+
   const table = useReactTable({
     data,
     columns,
@@ -173,39 +169,64 @@ export function TodoTable() {
 
   return (
     <div className="w-full">
-      <div className="flex items-center py-4">
+      <div className="flex items-center py-4 justify-between">
         <Input
-          placeholder="Search by status"
-          value={(table.getColumn('status')?.getFilterValue() as string) ?? ''}
+          placeholder="Search "
+          value={(table.getColumn('title')?.getFilterValue() as string) ?? ''}
           onChange={event =>
-            table.getColumn('status')?.setFilterValue(event.target.value)
+            table.getColumn('title')?.setFilterValue(event.target.value)
           }
           className="max-w-sm"
         />
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="ml-auto">
-              Columns <ChevronDown className="ml-2 h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            {table
-              .getAllColumns()
-              .filter(column => column.getCanHide())
-              .map(column => {
-                return (
-                  <DropdownMenuCheckboxItem
-                    key={column.id}
-                    className="capitalize"
-                    checked={column.getIsVisible()}
-                    onCheckedChange={value => column.toggleVisibility(!!value)}
-                  >
-                    {column.id}
-                  </DropdownMenuCheckboxItem>
-                );
-              })}
-          </DropdownMenuContent>
-        </DropdownMenu>
+
+        <div className="flex gap-1">
+          <Select
+            onValueChange={value =>
+              table.getColumn('status')?.setFilterValue(value.trim())
+            }
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Filter by status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value={' '}>All</SelectItem>
+                {Object.values(Status).map(status => (
+                  <SelectItem value={status} key={status}>
+                    {status}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">
+                Columns <ChevronDown className="ml-2 h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {table
+                .getAllColumns()
+                .filter(column => column.getCanHide())
+                .map(column => {
+                  return (
+                    <DropdownMenuCheckboxItem
+                      key={column.id}
+                      className="capitalize"
+                      checked={column.getIsVisible()}
+                      onCheckedChange={value =>
+                        column.toggleVisibility(!!value)
+                      }
+                    >
+                      {column.id}
+                    </DropdownMenuCheckboxItem>
+                  );
+                })}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
       <div className="rounded-md border">
         <Table>
@@ -267,7 +288,15 @@ export function TodoTable() {
           {table.getFilteredSelectedRowModel().rows.length} of{' '}
           {table.getFilteredRowModel().rows.length} row(s) selected.
         </div>
+
         <div className="space-x-2">
+          <Button
+            onClick={deleteSelected}
+            disabled={table.getFilteredSelectedRowModel().rows.length < 1}
+            variant="destructive"
+          >
+            Delete Selected
+          </Button>
           <Button
             variant="outline"
             size="sm"
