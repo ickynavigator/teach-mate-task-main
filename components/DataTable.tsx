@@ -49,7 +49,7 @@ import {
   SelectValue,
 } from './ui/select';
 
-export const columns: ColumnDef<Task>[] = [
+const columns: ColumnDef<Task>[] = [
   {
     id: 'select',
     header: ({ table }) => (
@@ -171,7 +171,7 @@ export function TodoTable() {
     <div className="w-full">
       <div className="flex items-center py-4 justify-between">
         <Input
-          placeholder="Search "
+          placeholder="Search title"
           value={(table.getColumn('title')?.getFilterValue() as string) ?? ''}
           onChange={event =>
             table.getColumn('title')?.setFilterValue(event.target.value)
