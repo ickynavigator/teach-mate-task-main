@@ -67,7 +67,6 @@ export function TaskModal(props: Props) {
   const form = useForm<Task>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      id: task?.id || generateUniqueId(),
       title: task?.title || '',
       description: task?.description || '',
       date: task?.date,
@@ -93,7 +92,11 @@ export function TaskModal(props: Props) {
         <Form {...form}>
           <form
             onSubmit={form.handleSubmit(values => {
-              submitAction(values);
+              submitAction({
+                ...values,
+                id: task?.id || generateUniqueId(),
+              });
+              form.reset();
               setOpen(false);
             })}
             className="space-y-8"
